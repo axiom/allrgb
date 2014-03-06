@@ -15,10 +15,16 @@ func main() {
 			rect,
 			allrgb.ColorProducerFunc(examples.SampleColorProducer),
 			examples.NewTrivialPlacer(rect)),
+
 		"hilbert": allrgb.ColorDetermined(
 			rect,
 			allrgb.ColorProducerFunc(examples.SampleColorProducer),
 			examples.NewHilbertPlacer(rect)),
+
+		"frontier": allrgb.ColorDetermined(
+			rect,
+			allrgb.ColorProducerFunc(examples.SampleColorProducer),
+			examples.NewFrontier(rect)),
 	}
 
 	for name, img := range configurations {
