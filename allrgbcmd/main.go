@@ -20,11 +20,6 @@ func main() {
 			rect,
 			allrgb.ColorProducerFunc(examples.SampleColorProducer),
 			examples.NewHilbertPlacer(rect)),
-
-		"frontier": allrgb.ColorDetermined(
-			rect,
-			allrgb.ColorProducerFunc(examples.SampleColorProducer),
-			examples.NewFrontier(rect)),
 	}
 
 	for name, img := range configurations {
@@ -32,4 +27,11 @@ func main() {
 			fmt.Printf("Could not do %v: %v\n", name, err)
 		}
 	}
+
+	allrgb.ColorDeterminedFrameSaver(
+		rect,
+		allrgb.ColorProducerFunc(examples.SampleColorProducer),
+		examples.NewFrontier(rect),
+		"frontier",
+	)
 }

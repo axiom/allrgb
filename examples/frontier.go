@@ -9,32 +9,48 @@ import (
 type frontier struct {
 	image.Rectangle
 	frontier map[image.Point]bool
-	taken    map[image.Point]bool
+	taken    map[image.Point]color.Color
 }
 
 func NewFrontier(rect image.Rectangle) *frontier {
 	f := frontier{}
 	f.frontier = make(map[image.Point]bool)
-	f.taken = make(map[image.Point]bool)
+	f.taken = make(map[image.Point]color.Color)
 	f.Max = rect.Max
 
 	// Start at some place.
-	f.take([]image.Point{image.Point{X: 0, Y: 0}})
-
-	fmt.Printf("%#v\n", f)
+	f.extend([]image.Point{{0, 0}})
 
 	return &f
 }
 
 func (f *frontier) Place(c color.Color) image.Point {
-	p := image.Point{}
-	for p, _ = range f.frontier {
-		break
+	var best image.Point
+	shortest := 0xfffffffffffffff
+
+	// We want to find the place with the least color differance in the frontier.
+	for p, _ := range f.frontier {
+		var colors []color.Color
+		for _, neighbour := range f.takenNeighbours(p) {
+			colors = append(colors, f.taken[neighbour])
+		}
+
+		if distance := colorDistance(c, colors); distance < shortest {
+			shortest = distance
+			best = p
+		}
 	}
 
-	f.take([]image.Point{p})
+	if shortest == 0xfffffffffffffff {
+		fmt.Println("COULD NOT FIND GOOD MATCH")
+	}
 
-	return p
+	if _, ok := f.taken[best]; ok {
+		panic("OMG TRIED TO PLACE ON TAKEN POINT")
+	}
+
+	f.take(best, c)
+	return best
 }
 
 // Get all the possible neighbourns of the given point.
@@ -79,12 +95,26 @@ func (f frontier) availableNeighbours(p image.Point) []image.Point {
 	available := make([]image.Point, 0, len(neighbours))
 
 	for _, neighbour := range neighbours {
-		if taken, ok := f.taken[neighbour]; !ok || ok && !taken {
+		if _, ok := f.taken[neighbour]; !ok {
 			available = append(available, neighbour)
 		}
 	}
 
 	return available
+}
+
+// Get only the taken (painted) neighbours of the given point.
+func (f frontier) takenNeighbours(p image.Point) []image.Point {
+	neighbours := f.neighbours(p)
+	taken := make([]image.Point, 0, len(neighbours))
+
+	for _, neighbour := range neighbours {
+		if _, ok := f.taken[neighbour]; ok {
+			taken = append(taken, neighbour)
+		}
+	}
+
+	return taken
 }
 
 // Extend the frontier with more points.
@@ -95,10 +125,37 @@ func (f *frontier) extend(ps []image.Point) {
 }
 
 // Take some points from the frontier.
-func (f *frontier) take(ps []image.Point) {
-	for _, p := range ps {
-		f.taken[p] = true
-		delete(f.frontier, p)
-		f.extend(f.availableNeighbours(p))
+func (f *frontier) take(p image.Point, c color.Color) {
+	f.taken[p] = c
+	f.extend(f.availableNeighbours(p))
+	delete(f.frontier, p)
+}
+
+// Get a distance value for the differance of the given color to the slice of colors.
+func colorDistance(c color.Color, colors []color.Color) int {
+	var diff, r, g, b int
+	var rr, gg, bb uint32
+
+	rr, gg, bb, _ = c.RGBA()
+	r = int(rr)
+	g = int(gg)
+	b = int(bb)
+
+	for _, color := range colors {
+		rr, gg, bb, _ := color.RGBA()
+
+		diff += abs(r-int(rr)) / 3
+		diff += abs(g-int(gg)) / 3
+		diff += abs(b-int(bb)) / 3
+	}
+
+	return diff / (1 + len(colors))
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -int(v)
+	} else {
+		return int(v)
 	}
 }

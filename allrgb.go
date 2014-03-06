@@ -78,6 +78,26 @@ func PlaceDetermined(rect image.Rectangle, c Colorer, pp PlaceProducer) image.Im
 	return img
 }
 
+func ColorDeterminedFrameSaver(rect image.Rectangle, cp ColorProducer, p Placer, name string) error {
+	img := image.NewRGBA(rect)
+	frame := 0
+	for c := range cp.Produce() {
+		p := p.Place(c)
+		img.Set(p.X, p.Y, c)
+
+		f, err := os.Create(fmt.Sprintf("%v-%v.png", name, frame))
+		if err != nil {
+			return err
+		}
+		png.Encode(f, img)
+		f.Close()
+
+		frame++
+	}
+
+	return nil
+}
+
 func SaveImage(name string, img image.Image) error {
 	f, err := os.Create(fmt.Sprintf("%v.png", name))
 	if err != nil {
