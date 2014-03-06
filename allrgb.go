@@ -1,4 +1,4 @@
-package main
+package allrgb
 
 import (
 	"fmt"
@@ -8,6 +8,9 @@ import (
 	"math/rand"
 	"os"
 )
+
+//////////////////////////////////////////////////////////
+// Color determined
 
 // Placer determines where a color should go.
 type Placer interface {
@@ -20,14 +23,40 @@ func (pf PlacerFunc) Place(c color.Color) image.Point {
 	return pf(c)
 }
 
-type Producer interface {
+// Used to produce a sequence of colors to be placed.
+type ColorProducer interface {
 	Produce() chan color.Color
 }
 
-type ProducerFunc func() chan color.Color
+type ColorProducerFunc func() chan color.Color
 
-func (pf ProducerFunc) Produce() chan color.Color {
+func (pf ColorProducerFunc) Produce() chan color.Color {
 	return pf()
+}
+
+////////////////////////////////////////////////////////
+// Position determined
+
+// Colorer determines the color of a given point.
+type Colorer interface {
+	Color(image.Point) color.Color
+}
+
+type ColorerFunc func(image.Point) color.Color
+
+func (cf ColorerFunc) Color(p image.Point) color.Color {
+	return cf(p)
+}
+
+// Used to produce a sequence of postions to be painted.
+type PlaceProducer interface {
+	Produce() chan image.Point
+}
+
+type PlaceProducerFunc func() chan image.Point
+
+func (ppf PlaceProducerFunc) Produce() chan image.Point {
+	return ppf()
 }
 
 ////////////////////////////////////////////////////////
@@ -51,7 +80,7 @@ func rot(n, x, y, rx, ry int) (int, int) {
 	return x_, y_
 }
 
-func newHilbert(rect image.Rectangle) hilbert {
+func newHilbert(rect image.Rectangle) *hilbert {
 	h := hilbert{
 		next: make(chan image.Point),
 	}
@@ -72,7 +101,7 @@ func newHilbert(rect image.Rectangle) hilbert {
 		}
 		close(h.next)
 	}()
-	return h
+	return &h
 }
 
 func (h hilbert) Place(c color.Color) image.Point {
@@ -86,10 +115,10 @@ type trivialPlacer struct {
 	count int
 }
 
-func newTrivialPlacer(rect image.Rectangle) trivialPlacer {
+func newTrivialPlacer(rect image.Rectangle) *trivialPlacer {
 	tp := trivialPlacer{}
 	tp.Max = rect.Max
-	return tp
+	return &tp
 }
 
 func (tp *trivialPlacer) Place(_ color.Color) image.Point {
@@ -140,7 +169,7 @@ func (rp *randomPlacer) Place(_ color.Color) image.Point {
 
 /////////////////////////////////////////////////////////
 
-func produceColors() chan color.Color {
+func sampleColorProducer() chan color.Color {
 	nextColor := make(chan color.Color)
 	go func() {
 		for r := 0; r < 32; r++ {
@@ -161,31 +190,30 @@ func produceColors() chan color.Color {
 
 ////////////////////////////////////////////////////////
 
-func main() {
-	bits := 15
-	rect := image.Rectangle{Max: image.Point{X: 256, Y: 128}}
+func ColorDetermined(rect image.Rectangle, cp ColorProducer, p Placer) image.Image {
 	img := image.NewRGBA(rect)
-	fmt.Println(bits, rect)
+	for c := range cp.Produce() {
+		p := p.Place(c)
+		img.Set(p.X, p.Y, c)
+	}
+	return img
+}
 
-	f, err := os.Create("allrgb.png")
+func PlaceDetermined(rect image.Rectangle, c Colorer, pp PlaceProducer) image.Image {
+	img := image.NewRGBA(rect)
+	for p := range pp.Produce() {
+		c := c.Color(p)
+		img.Set(p.X, p.Y, c)
+	}
+	return img
+}
+
+func SaveImage(name string, img image.Image) error {
+	f, err := os.Create(fmt.Sprintf("%v.png", name))
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	defer f.Close()
 
-	nextColor := ProducerFunc(produceColors).Produce()
-
-	//h := newHilbert(rect)
-	h := newTrivialPlacer(rect)
-	//h := newRandomPlacer(rect)
-	for c := range nextColor {
-		p := h.Place(c)
-		img.Set(p.X, p.Y, c)
-	}
-
-	if err = png.Encode(f, img); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	return png.Encode(f, img)
 }
