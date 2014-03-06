@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"github.com/axiom/allrgb"
 	"github.com/axiom/allrgb/examples"
+	"image"
 )
 
 func main() {
@@ -20,7 +22,7 @@ func main() {
 	}
 
 	for name, img := range configurations {
-		if err := SaveImage(name, img); err != nil {
+		if err := allrgb.SaveImage(name, img); err != nil {
 			fmt.Printf("Could not do %v: %v\n", name, err)
 		}
 	}
