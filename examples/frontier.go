@@ -19,7 +19,7 @@ func NewFrontier(rect image.Rectangle) *frontier {
 	f.Max = rect.Max
 
 	// Start at some place.
-	f.extend([]image.Point{{0, 0}})
+	f.extend([]image.Point{{rect.Dx() / 2, rect.Dy() / 2}})
 
 	return &f
 }
