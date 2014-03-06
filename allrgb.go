@@ -85,7 +85,7 @@ func ColorDeterminedFrameSaver(rect image.Rectangle, cp ColorProducer, p Placer,
 		p := p.Place(c)
 		img.Set(p.X, p.Y, c)
 
-		f, err := os.Create(fmt.Sprintf("%v-%v.png", name, frame))
+		f, err := os.Create(fmt.Sprintf("%v-%08d.png", name, frame))
 		if err != nil {
 			return err
 		}
