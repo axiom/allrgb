@@ -1,9 +1,11 @@
 package examples
 
 import (
+	sadcolor "code.google.com/p/sadbox/color"
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 )
 
 type frontier struct {
@@ -133,29 +135,13 @@ func (f *frontier) take(p image.Point, c color.Color) {
 
 // Get a distance value for the differance of the given color to the slice of colors.
 func colorDistance(c color.Color, colors []color.Color) int {
-	var diff, r, g, b int
-	var rr, gg, bb uint32
-
-	rr, gg, bb, _ = c.RGBA()
-	r = int(rr)
-	g = int(gg)
-	b = int(bb)
-
+	chsl := sadcolor.HSLModel.Convert(c).(sadcolor.HSL)
+	diff := 0.0
+	var cchsl sadcolor.HSL
 	for _, color := range colors {
-		rr, gg, bb, _ := color.RGBA()
-
-		diff += abs(r-int(rr)) / 3
-		diff += abs(g-int(gg)) / 3
-		diff += abs(b-int(bb)) / 3
+		cchsl = sadcolor.HSLModel.Convert(color).(sadcolor.HSL)
+		diff += math.Sqrt(math.Pow(chsl.L-cchsl.L, 2))
 	}
 
-	return diff / (1 + len(colors))
-}
-
-func abs(v int) int {
-	if v < 0 {
-		return -int(v)
-	} else {
-		return int(v)
-	}
+	return int(100000*diff) / (1 + len(colors))
 }
