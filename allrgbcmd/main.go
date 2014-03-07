@@ -5,9 +5,15 @@ import (
 	"github.com/axiom/allrgb"
 	"github.com/axiom/allrgb/examples"
 	"image"
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func main() {
+	go func() {
+		fmt.Println(http.ListenAndServe("localhost:8080", nil))
+	}()
+
 	rect := image.Rectangle{Max: image.Point{X: 256, Y: 128}}
 
 	configurations := map[string]image.Image{
