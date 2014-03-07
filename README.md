@@ -5,3 +5,4 @@ Inspired by http://codegolf.stackexchange.com/questions/22144/images-with-all-co
 ![](hilbert.png)
 ![](trivial.png)
 ![](frontier.png)
+![](frontier1.png)
