@@ -14,7 +14,7 @@ type frontier struct {
 	frontier       map[image.Point]bool
 	taken          map[image.Point]sadcolor.HSL
 	occupied       []bool
-	previousPoints [10]image.Point
+	previousPoints [25]image.Point
 	direction      float64
 }
 
@@ -64,16 +64,16 @@ func (f *frontier) Place(c color.Color) image.Point {
 		var colors []sadcolor.HSL
 
 		// Get the colors of all the taken neighbours so we can use those for the distance calculations.
-		neighbours := f.takenNeighbours(p)
+		neighbours := f.takenNeighbours(p, 1)
 		for _, neighbour := range neighbours {
 			colors = append(colors, f.taken[neighbour])
 		}
 
 		distance := 0.0
-		distance += 500 * colorDistance(c, colors)
-		distance += 10 * neighboursCount(p, neighbours)
-		distance += 10 * f.distancePrevious(p)
-		//distance += 1 * f.distanceDirection(p)
+		distance += 10 * colorDistance(c, colors)
+		distance += -50 * neighboursCount(p, neighbours)
+		distance += 50 * f.distancePrevious(p)
+		//distance += 10 * f.distanceDirection(p)
 		if distance < shortest {
 			shortest = distance
 			best = p
@@ -85,15 +85,15 @@ func (f *frontier) Place(c color.Color) image.Point {
 }
 
 // Get all the possible neighbourns of the given point.
-func (f *frontier) neighbours(p image.Point) []image.Point {
+func (f *frontier) neighbours(p image.Point, moore int) []image.Point {
 	// There can be at most 8 neighbours
 	neighbours := make([]image.Point, 0, 8)
 
 	maxX := f.Rectangle.Max.X
 	maxY := f.Rectangle.Max.Y
 
-	for dx := -1; dx <= 1; dx++ {
-		for dy := -1; dy <= 1; dy++ {
+	for dx := -moore; dx <= moore; dx++ {
+		for dy := -moore; dy <= moore; dy++ {
 			if dx == 0 && dy == 0 {
 				continue
 			}
@@ -109,9 +109,9 @@ func (f *frontier) neighbours(p image.Point) []image.Point {
 }
 
 // Get only the available (unpainted) neighbours of the given point.
-func (f *frontier) availableNeighbours(p image.Point) []image.Point {
+func (f *frontier) availableNeighbours(p image.Point, moore int) []image.Point {
 	neighbours := make([]image.Point, 0, 8)
-	for _, neighbour := range f.neighbours(p) {
+	for _, neighbour := range f.neighbours(p, moore) {
 		if !f.occupied[allrgb.PointToOffset(neighbour, f.Rectangle)] {
 			neighbours = append(neighbours, neighbour)
 		}
@@ -120,9 +120,9 @@ func (f *frontier) availableNeighbours(p image.Point) []image.Point {
 }
 
 // Get only the taken (painted) neighbours of the given point.
-func (f *frontier) takenNeighbours(p image.Point) []image.Point {
+func (f *frontier) takenNeighbours(p image.Point, moore int) []image.Point {
 	neighbours := make([]image.Point, 0, 8)
-	for _, neighbour := range f.neighbours(p) {
+	for _, neighbour := range f.neighbours(p, moore) {
 		if f.occupied[allrgb.PointToOffset(neighbour, f.Rectangle)] {
 			neighbours = append(neighbours, neighbour)
 		}
@@ -155,7 +155,7 @@ func (f *frontier) take(p image.Point, c color.Color) {
 	f.taken[p] = sadcolor.HSLModel.Convert(c).(sadcolor.HSL)
 	f.occupied[offset] = true
 
-	f.extend(f.availableNeighbours(p))
+	f.extend(f.availableNeighbours(p, 1))
 	delete(f.frontier, p)
 }
 
@@ -164,20 +164,44 @@ func (f *frontier) offset(p image.Point) int {
 }
 
 func (f *frontier) distancePrevious(p image.Point) float64 {
-	diff := 0.0
-	for _, pp := range f.previousPoints {
-		dx := math.Abs(float64(pp.X - p.X))
-		dy := math.Abs(float64(pp.Y - p.Y))
-		diff += math.Pow(math.Min(dx, float64(f.Rectangle.Dx())-dx), 2)
-		diff += math.Pow(math.Min(dy, float64(f.Rectangle.Dy())-dy), 2)
+	centroid := image.Point{}
 
+	for _, pp := range f.previousPoints {
+		centroid.X += pp.X
+		centroid.Y += pp.Y
 	}
-	return math.Sqrt(diff / float64(len(f.previousPoints)))
+
+	centroid.X /= len(f.previousPoints)
+	centroid.Y /= len(f.previousPoints)
+
+	dx := math.Abs(float64(centroid.X - p.X))
+	dy := math.Abs(float64(centroid.Y - p.Y))
+	return math.Sqrt(
+		math.Pow(math.Min(dx, float64(f.Rectangle.Dx())-dx), 2) +
+			math.Pow(math.Min(dy, float64(f.Rectangle.Dy())-dy), 2))
+
+	/*
+
+		diff := 0.0
+		for _, pp := range f.previousPoints {
+			dx := math.Abs(float64(pp.X - p.X))
+			dy := math.Abs(float64(pp.Y - p.Y))
+			d := 0.0
+			d += math.Pow(math.Min(dx, float64(f.Rectangle.Dx())-dx), 2)
+			d += math.Pow(math.Min(dy, float64(f.Rectangle.Dy())-dy), 2)
+			if d > diff {
+				diff = d
+			}
+
+		}
+		return math.Sqrt(diff)
+		//return math.Sqrt(diff / float64(len(f.previousPoints)))
+	*/
 }
 
 func (f *frontier) distanceDirection(p image.Point) float64 {
 	direction := math.Atan2(float64(f.previousPoints[0].X-p.X), float64(f.previousPoints[0].Y-p.Y))
-	diff := math.Abs(direction - f.direction)
+	diff := math.Abs(math.Pi/3 - (direction - f.direction))
 	return math.Pow(diff, 2)
 }
 
@@ -191,16 +215,21 @@ func colorDistance(color color.Color, colors []sadcolor.HSL) float64 {
 		return 0
 	}
 
-	c := sadcolor.HSLModel.Convert(color).(sadcolor.HSL)
-	diff := -10.0e127
+	//c := sadcolor.HSLModel.Convert(color).(sadcolor.HSL)
+	diff := 0.0 //-10.0e127
+	r, g, b, _ := color.RGBA()
 	for _, cc := range colors {
-		d := 2*math.Pow(c.H-cc.H, 2) + math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
-		if d > diff {
-			diff = d
-		}
-		// diff += 2*math.Pow(c.H-cc.H, 2) + math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
+		/*
+			d := math.Pow(c.H-cc.H, 2) + 2*math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
+			if d > diff {
+				diff = d
+			}
+		*/
+		//diff += math.Pow(c.H-cc.H, 2) + math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
+		rr, gg, bb, _ := cc.RGBA()
+		diff += math.Pow(float64(r)-float64(rr), 2) + math.Pow(float64(g)-float64(gg), 2) + math.Pow(float64(b)-float64(bb), 2)
 	}
 
-	return math.Sqrt(diff)
-	//return math.Sqrt(diff / float64(len(colors)))
+	//return math.Sqrt(diff)
+	return math.Sqrt(diff / float64(len(colors)))
 }

@@ -144,10 +144,13 @@ func timer(rate int, totalFrames int) func() {
 				fps = float64(framediff) / timediff.Seconds()
 			}
 
+			eta := time.Duration(float64(totalFrames-frame)/fps) * time.Second
+
 			fmt.Printf(
-				"% 3.0f%% % 5.0f fps\n",
+				"% 3.0f%% % 5.0f fps ETA %v\n",
 				float64(100*frame)/float64(totalFrames),
 				fps,
+				eta,
 			)
 
 			previousFrame = frame

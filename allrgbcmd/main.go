@@ -47,7 +47,8 @@ func main() {
 
 	allrgb.ColorDeterminedFrameSaver(
 		rect,
-		NewHSLColorProducer(H, S, L, true, true, true),
+		//NewHSLColorProducer(H, L, S, true, true, true),
+		allrgb.ColorProducerFunc(HSLColorProducer),
 		NewFrontier(rect),
 		100,
 		fmt.Sprintf("frames/frontier-%v", time.Now().Format("20060102T150405")),
