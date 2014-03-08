@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+	"time"
 )
 
 //////////////////////////////////////////////////////////
@@ -77,24 +78,22 @@ func OffsetToPoint(offset int, rect image.Rectangle) image.Point {
 
 func ColorDetermined(rect image.Rectangle, cp ColorProducer, p Placer) image.Image {
 	img := image.NewRGBA(rect)
-	counter := 0
+	tick := timer(1000, rect.Dx()*rect.Dy())
 	for c := range cp.Produce() {
 		p := p.Place(c)
 		img.Set(p.X, p.Y, c)
-		counter++
-
-		if counter%1000 == 0 {
-			fmt.Printf("% 3.0f%%\n", float64(100*counter)/float64(rect.Dx()*rect.Dy()))
-		}
+		tick()
 	}
 	return img
 }
 
 func PlaceDetermined(rect image.Rectangle, c Colorer, pp PlaceProducer) image.Image {
 	img := image.NewRGBA(rect)
+	tick := timer(1000, rect.Dx()*rect.Dy())
 	for p := range pp.Produce() {
 		c := c.Color(p)
 		img.Set(p.X, p.Y, c)
+		tick()
 	}
 	return img
 }
@@ -102,20 +101,17 @@ func PlaceDetermined(rect image.Rectangle, c Colorer, pp PlaceProducer) image.Im
 func ColorDeterminedFrameSaver(rect image.Rectangle, cp ColorProducer, p Placer, rate int, name string) error {
 	img := image.NewRGBA(rect)
 	frame := 0
+	tick := timer(rate, rect.Dx()*rect.Dy())
 	for c := range cp.Produce() {
 		p := p.Place(c)
 		img.Set(p.X, p.Y, c)
 
+		tick()
 		if frame%rate == 0 {
 			if err := SaveImage(fmt.Sprintf("%v-%05d.png", name, frame), img); err != nil {
 				return err
 			}
-
-			if frame%1000 == 0 {
-				fmt.Printf("% 3.0f%%\n", float64(100*frame)/float64(rect.Dx()*rect.Dy()))
-			}
 		}
-
 		frame++
 	}
 
@@ -130,4 +126,34 @@ func SaveImage(name string, img image.Image) error {
 	defer f.Close()
 
 	return png.Encode(f, img)
+}
+
+func timer(rate int, totalFrames int) func() {
+	frame := 0
+	previousFrame := 0
+	timestamp := time.Now()
+
+	return func() {
+		if frame%rate == 0 || frame == totalFrames {
+			now := time.Now()
+			timediff := now.Sub(timestamp)
+			framediff := frame - previousFrame
+			fps := 0.0
+
+			if timediff.Nanoseconds() > 0 {
+				fps = float64(framediff) / timediff.Seconds()
+			}
+
+			fmt.Printf(
+				"% 3.0f%% % 5.0f fps\n",
+				float64(100*frame)/float64(totalFrames),
+				fps,
+			)
+
+			previousFrame = frame
+			timestamp = now
+		}
+
+		frame++
+	}
 }

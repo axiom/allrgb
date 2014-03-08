@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/axiom/allrgb"
-	"github.com/axiom/allrgb/examples"
+	. "github.com/axiom/allrgb/examples"
 	"image"
+	"time"
 	//"net/http"
 	//_ "net/http/pprof"
 )
@@ -22,34 +23,34 @@ func main() {
 	configurations := map[string]image.Image{
 		"trivial.png": allrgb.ColorDetermined(
 			rect,
-			allrgb.ColorProducerFunc(examples.HSLColorProducer),
-			examples.NewTrivialPlacer(rect)),
+			allrgb.ColorProducerFunc(HSLColorProducer),
+			NewTrivialPlacer(rect)),
 
 		"hilbert.png": allrgb.ColorDetermined(
 			rect,
-			allrgb.ColorProducerFunc(examples.HSLColorProducer),
-			examples.NewHilbertPlacer(rect)),
+			allrgb.ColorProducerFunc(HSLColorProducer),
+			NewHilbertPlacer(rect)),
 
-		"frontier": allrgb.ColorDetermined(
-			rect,
-			allrgb.ColorProducerFunc(examples.SampleColorProducer),
-			examples.NewFrontier(rect)),
+		/*
+			"frontier": allrgb.ColorDetermined(
+				rect,
+				allrgb.ColorProducerFunc(RGBColorProducer),
+				NewFrontier(rect)),
+		*/
 	}
 
-	/*
-		for name, img := range configurations {
-			if err := allrgb.SaveImage(name, img); err != nil {
-				fmt.Printf("Could not do %v: %v\n", name, err)
-			}
+	for name, img := range configurations {
+		if err := allrgb.SaveImage(name, img); err != nil {
+			fmt.Printf("Could not do %v: %v\n", name, err)
 		}
-	*/
+	}
 
 	allrgb.ColorDeterminedFrameSaver(
 		rect,
-		allrgb.ColorProducerFunc(examples.HSLColorProducer),
-		examples.NewFrontier(rect),
+		NewHSLColorProducer(H, S, L, true, true, true),
+		NewFrontier(rect),
 		100,
-		"frontier",
+		fmt.Sprintf("frames/frontier-%v", time.Now().Format("20060102T150405")),
 	)
 
 }

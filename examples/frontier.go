@@ -6,22 +6,16 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"sync"
+	"math/rand"
 )
 
-type queueItem struct {
-	result chan image.Point
-	color  color.Color
-}
-
 type frontier struct {
-	sync.Mutex
 	image.Rectangle
-	frontier      map[image.Point]bool
-	taken         map[image.Point]sadcolor.HSL
-	occupied      []bool
-	placeQueue    chan queueItem
-	previousPoint image.Point
+	frontier       map[image.Point]bool
+	taken          map[image.Point]sadcolor.HSL
+	occupied       []bool
+	previousPoints [10]image.Point
+	direction      float64
 }
 
 func NewFrontier(rect image.Rectangle) *frontier {
@@ -29,19 +23,40 @@ func NewFrontier(rect image.Rectangle) *frontier {
 	f.frontier = make(map[image.Point]bool)
 	f.taken = make(map[image.Point]sadcolor.HSL)
 	f.occupied = make([]bool, rect.Dx()*rect.Dy())
-	f.placeQueue = make(chan queueItem)
 	f.Max = rect.Max
 
+	rand.Intn(10)
+
 	// Start at some place.
-	start := image.Point{rect.Dx() / 2, rect.Dy() / 2}
-	f.previousPoint = start
-	f.extend([]image.Point{start})
+	f.extend([]image.Point{
+		// Center
+		{f.Max.X / 2, f.Max.Y / 2},
+
+		// Corners
+		/*
+			{0, 0},
+			{f.Max.X - 1, 0},
+			f.Max.Sub(image.Point{1, 1}),
+			{0, f.Max.Y - 1},
+		*/
+
+		// Random starting points.
+		/*
+			{rand.Intn(f.Max.X), rand.Intn(f.Max.Y)},
+			{rand.Intn(f.Max.X), rand.Intn(f.Max.Y)},
+			{rand.Intn(f.Max.X), rand.Intn(f.Max.Y)},
+			{rand.Intn(f.Max.X), rand.Intn(f.Max.Y)},
+			{rand.Intn(f.Max.X), rand.Intn(f.Max.Y)},
+			{rand.Intn(f.Max.X), rand.Intn(f.Max.Y)},
+			{rand.Intn(f.Max.X), rand.Intn(f.Max.Y)},
+		*/
+	})
 
 	return &f
 }
 
 func (f *frontier) Place(c color.Color) image.Point {
-	best := f.previousPoint
+	best := f.previousPoints[0]
 	shortest := 10e128
 
 	// We want to find the place with the least color differance in the frontier.
@@ -49,11 +64,17 @@ func (f *frontier) Place(c color.Color) image.Point {
 		var colors []sadcolor.HSL
 
 		// Get the colors of all the taken neighbours so we can use those for the distance calculations.
-		for _, neighbour := range f.takenNeighbours(p) {
+		neighbours := f.takenNeighbours(p)
+		for _, neighbour := range neighbours {
 			colors = append(colors, f.taken[neighbour])
 		}
 
-		if distance := colorDistance(c, colors) + f.distancePrevious(p); distance < shortest {
+		distance := 0.0
+		distance += 0 * colorDistance(c, colors)
+		distance += -1 * neighboursCount(p, neighbours)
+		distance += -1 * f.distancePrevious(p)
+		distance += 0 * f.distanceDirection(p)
+		if distance < shortest {
 			shortest = distance
 			best = p
 		}
@@ -64,7 +85,7 @@ func (f *frontier) Place(c color.Color) image.Point {
 }
 
 // Get all the possible neighbourns of the given point.
-func (f frontier) neighbours(p image.Point) []image.Point {
+func (f *frontier) neighbours(p image.Point) []image.Point {
 	// There can be at most 8 neighbours
 	neighbours := make([]image.Point, 0, 8)
 
@@ -99,7 +120,7 @@ func (f frontier) neighbours(p image.Point) []image.Point {
 }
 
 // Get only the available (unpainted) neighbours of the given point.
-func (f frontier) availableNeighbours(p image.Point) []image.Point {
+func (f *frontier) availableNeighbours(p image.Point) []image.Point {
 	neighbours := make([]image.Point, 0, 8)
 	for _, neighbour := range f.neighbours(p) {
 		if !f.occupied[allrgb.PointToOffset(neighbour, f.Rectangle)] {
@@ -110,7 +131,7 @@ func (f frontier) availableNeighbours(p image.Point) []image.Point {
 }
 
 // Get only the taken (painted) neighbours of the given point.
-func (f frontier) takenNeighbours(p image.Point) []image.Point {
+func (f *frontier) takenNeighbours(p image.Point) []image.Point {
 	neighbours := make([]image.Point, 0, 8)
 	for _, neighbour := range f.neighbours(p) {
 		if f.occupied[allrgb.PointToOffset(neighbour, f.Rectangle)] {
@@ -136,7 +157,11 @@ func (f *frontier) take(p image.Point, c color.Color) {
 		panic("I lost the race")
 	}
 
-	f.previousPoint = p
+	f.direction = math.Atan2(float64(f.previousPoints[0].X-p.X), float64(f.previousPoints[0].Y-p.Y))
+	for i := len(f.previousPoints) - 1; i > 0; i-- {
+		f.previousPoints[i] = f.previousPoints[i-1]
+	}
+	f.previousPoints[0] = p
 
 	f.taken[p] = sadcolor.HSLModel.Convert(c).(sadcolor.HSL)
 	f.occupied[offset] = true
@@ -145,23 +170,40 @@ func (f *frontier) take(p image.Point, c color.Color) {
 	delete(f.frontier, p)
 }
 
-func (f frontier) distancePrevious(p image.Point) float64 {
-	dx := f.previousPoint.X - p.X
-	dy := f.previousPoint.Y - p.Y
-	return 3 * math.Sqrt(math.Pow(float64(dx), 2)+math.Pow(float64(dy), 2))
-}
-
 func (f *frontier) offset(p image.Point) int {
 	return allrgb.PointToOffset(p, f.Rectangle)
 }
 
+func (f *frontier) distancePrevious(p image.Point) float64 {
+	diff := 0.0
+	for _, pp := range f.previousPoints {
+		diff += math.Pow(float64(pp.X-p.X), 2) + math.Pow(float64(pp.Y-p.Y), 2)
+
+	}
+	return math.Sqrt(diff / float64(len(f.previousPoints)))
+}
+
+func (f *frontier) distanceDirection(p image.Point) float64 {
+	direction := math.Atan2(float64(f.previousPoints[0].X-p.X), float64(f.previousPoints[0].Y-p.Y))
+	diff := math.Abs(direction - f.direction)
+	return math.Pow(diff, 2)
+}
+
+func neighboursCount(p image.Point, neighbours []image.Point) float64 {
+	return math.Pow(float64(len(neighbours)), 2)
+}
+
 // Get a distance value for the differance of the given color to the slice of colors.
 func colorDistance(color color.Color, colors []sadcolor.HSL) float64 {
+	if len(colors) == 0 {
+		return 0
+	}
+
 	c := sadcolor.HSLModel.Convert(color).(sadcolor.HSL)
 	diff := 0.0
 	for _, cc := range colors {
-		diff += 3*math.Pow(c.H-cc.H, 2) + 2*math.Pow(c.L-cc.L, 2) + 1*math.Pow(c.S-cc.S, 2)
+		diff += 2*math.Pow(c.H-cc.H, 2) + math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
 	}
 
-	return 100 * math.Sqrt(diff) / float64(len(colors))
+	return math.Sqrt(diff / float64(len(colors)))
 }
