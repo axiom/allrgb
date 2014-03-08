@@ -62,9 +62,15 @@ func (ppf PlaceProducerFunc) Produce() chan image.Point {
 
 func ColorDetermined(rect image.Rectangle, cp ColorProducer, p Placer) image.Image {
 	img := image.NewRGBA(rect)
+	counter := 0
 	for c := range cp.Produce() {
 		p := p.Place(c)
 		img.Set(p.X, p.Y, c)
+		counter++
+
+		if counter%1000 == 0 {
+			fmt.Printf("% 3.0f%%\n", float64(100*counter)/float64(rect.Dx()*rect.Dy()))
+		}
 	}
 	return img
 }
@@ -78,24 +84,27 @@ func PlaceDetermined(rect image.Rectangle, c Colorer, pp PlaceProducer) image.Im
 	return img
 }
 
-func ColorDeterminedFrameSaver(rect image.Rectangle, cp ColorProducer, p Placer, name string) error {
+func ColorDeterminedFrameSaver(rect image.Rectangle, cp ColorProducer, p Placer, rate int, name string) error {
 	img := image.NewRGBA(rect)
 	frame := 0
 	for c := range cp.Produce() {
 		p := p.Place(c)
 		img.Set(p.X, p.Y, c)
 
-		f, err := os.Create(fmt.Sprintf("%v-%08d.png", name, frame))
-		if err != nil {
-			return err
+		if frame%rate == 0 {
+			if err := SaveImage(fmt.Sprintf("%v-%05d.png", name, frame), img); err != nil {
+				return err
+			}
+
+			if frame%1000 == 0 {
+				fmt.Printf("% 3.0f%%\n", float64(100*frame)/float64(rect.Dx()*rect.Dy()))
+			}
 		}
-		png.Encode(f, img)
-		f.Close()
 
 		frame++
 	}
 
-	return nil
+	return SaveImage(fmt.Sprintf("%v-%05d.png", name, frame), img)
 }
 
 func SaveImage(name string, img image.Image) error {
