@@ -70,10 +70,10 @@ func (f *frontier) Place(c color.Color) image.Point {
 		}
 
 		distance := 0.0
-		distance += 0 * colorDistance(c, colors)
-		distance += -1 * neighboursCount(p, neighbours)
-		distance += -1 * f.distancePrevious(p)
-		distance += 0 * f.distanceDirection(p)
+		distance += 500 * colorDistance(c, colors)
+		distance += 10 * neighboursCount(p, neighbours)
+		distance += 10 * f.distancePrevious(p)
+		//distance += 1 * f.distanceDirection(p)
 		if distance < shortest {
 			shortest = distance
 			best = p
@@ -89,31 +89,20 @@ func (f *frontier) neighbours(p image.Point) []image.Point {
 	// There can be at most 8 neighbours
 	neighbours := make([]image.Point, 0, 8)
 
-	if p.X > 0 {
-		neighbours = append(neighbours, p.Add(image.Point{-1, 0}))
-		if p.Y > 0 {
-			neighbours = append(neighbours, p.Add(image.Point{-1, -1}))
-		}
-		if p.Y+1 < f.Rectangle.Max.Y {
-			neighbours = append(neighbours, p.Add(image.Point{-1, 1}))
-		}
-	}
+	maxX := f.Rectangle.Max.X
+	maxY := f.Rectangle.Max.Y
 
-	if p.X+1 < f.Rectangle.Max.X {
-		neighbours = append(neighbours, p.Add(image.Point{1, 0}))
-		if p.Y > 0 {
-			neighbours = append(neighbours, p.Add(image.Point{1, -1}))
-		}
-		if p.Y+1 < f.Rectangle.Size().Y {
-			neighbours = append(neighbours, p.Add(image.Point{1, 1}))
-		}
-	}
+	for dx := -1; dx <= 1; dx++ {
+		for dy := -1; dy <= 1; dy++ {
+			if dx == 0 && dy == 0 {
+				continue
+			}
 
-	if p.Y > 0 {
-		neighbours = append(neighbours, p.Add(image.Point{0, -1}))
-	}
-	if p.Y+1 < f.Rectangle.Size().Y {
-		neighbours = append(neighbours, p.Add(image.Point{0, 1}))
+			np := p
+			np.X = (np.X + maxX + dx) % maxX
+			np.Y = (np.Y + maxY + dy) % maxY
+			neighbours = append(neighbours, np)
+		}
 	}
 
 	return neighbours
@@ -177,7 +166,10 @@ func (f *frontier) offset(p image.Point) int {
 func (f *frontier) distancePrevious(p image.Point) float64 {
 	diff := 0.0
 	for _, pp := range f.previousPoints {
-		diff += math.Pow(float64(pp.X-p.X), 2) + math.Pow(float64(pp.Y-p.Y), 2)
+		dx := math.Abs(float64(pp.X - p.X))
+		dy := math.Abs(float64(pp.Y - p.Y))
+		diff += math.Pow(math.Min(dx, float64(f.Rectangle.Dx())-dx), 2)
+		diff += math.Pow(math.Min(dy, float64(f.Rectangle.Dy())-dy), 2)
 
 	}
 	return math.Sqrt(diff / float64(len(f.previousPoints)))
@@ -200,10 +192,15 @@ func colorDistance(color color.Color, colors []sadcolor.HSL) float64 {
 	}
 
 	c := sadcolor.HSLModel.Convert(color).(sadcolor.HSL)
-	diff := 0.0
+	diff := -10.0e127
 	for _, cc := range colors {
-		diff += 2*math.Pow(c.H-cc.H, 2) + math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
+		d := 2*math.Pow(c.H-cc.H, 2) + math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
+		if d > diff {
+			diff = d
+		}
+		// diff += 2*math.Pow(c.H-cc.H, 2) + math.Pow(c.L-cc.L, 2) + math.Pow(c.S-cc.S, 2)
 	}
 
-	return math.Sqrt(diff / float64(len(colors)))
+	return math.Sqrt(diff)
+	//return math.Sqrt(diff / float64(len(colors)))
 }

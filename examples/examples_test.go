@@ -15,17 +15,12 @@ type MySuite struct{}
 
 var _ = Suite(&MySuite{})
 
-func TestHSLColorProducer(t *testing.T) {
-	const expected = 32768
-	if unique := countUniqueColors(allrgb.ColorProducerFunc(HSLColorProducer)); unique != expected {
-		t.Errorf("HSLColorProducer produced %v unique colors, want %v", unique, expected)
-	}
+func (s *MySuite) TestHSLColorProducer(c *C) {
+	c.Check(countUniqueColors(allrgb.ColorProducerFunc(HSLColorProducer)), Equals, 32768)
 }
-func TestRGBColorProducer(t *testing.T) {
-	const expected = 32768
-	if unique := countUniqueColors(allrgb.ColorProducerFunc(RGBColorProducer)); unique != expected {
-		t.Errorf("RGBColorProducer produced %v unique colors, want %v", unique, expected)
-	}
+
+func (s *MySuite) TestRGBColorProducer(c *C) {
+	c.Check(countUniqueColors(allrgb.ColorProducerFunc(RGBColorProducer)), Equals, 32768)
 }
 
 func (s *MySuite) TestFrontierNeighbours(c *C) {
@@ -40,9 +35,14 @@ func (s *MySuite) TestFrontierNeighbours(c *C) {
 		{
 			image.Point{0, 0},
 			[]image.Point{
+				{0, 1},
+				{0, 3},
 				{1, 0},
 				{1, 1},
-				{0, 1},
+				{1, 3},
+				{7, 0},
+				{7, 1},
+				{7, 3},
 			},
 		},
 		{
@@ -50,40 +50,49 @@ func (s *MySuite) TestFrontierNeighbours(c *C) {
 			[]image.Point{
 				{0, 0},
 				{0, 1},
+				{0, 3},
 				{1, 1},
-				{2, 1},
+				{1, 3},
 				{2, 0},
+				{2, 1},
+				{2, 3},
 			},
 		},
 		{
 			image.Point{1, 1},
 			[]image.Point{
 				{0, 0},
+				{0, 1},
+				{0, 2},
 				{1, 0},
+				{1, 2},
 				{2, 0},
 				{2, 1},
 				{2, 2},
-				{1, 2},
-				{0, 2},
-				{0, 1},
 			},
 		},
 		{
 			image.Point{7, 3},
 			[]image.Point{
+				{0, 0},
+				{0, 2},
+				{0, 3},
+				{6, 0},
 				{6, 2},
-				{7, 2},
 				{6, 3},
+				{7, 0},
+				{7, 2},
 			},
 		},
 	}
 
 	for _, tc := range testcases {
 		found := frontier.neighbours(tc.point)
+		expected := tc.neighbours
 		sort.Sort(neighbours(found))
-		sort.Sort(neighbours(tc.neighbours))
+		sort.Sort(neighbours(expected))
 
-		c.Check(found, DeepEquals, tc.neighbours)
+		c.Check(found, DeepEquals, expected)
 	}
 }
 
@@ -105,9 +114,9 @@ func (ns neighbours) Less(i, j int) bool {
 		return true
 	}
 
-	if ns[i].X == ns[j].X {
-		return ns[i].Y < ns[j].Y
+	if ns[i].X > ns[j].X {
+		return false
 	}
 
-	return false
+	return ns[i].Y < ns[j].Y
 }
