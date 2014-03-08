@@ -60,6 +60,21 @@ func (ppf PlaceProducerFunc) Produce() chan image.Point {
 
 ////////////////////////////////////////////////////////
 
+// Given a point and a rectangle return the offset representing that point.
+func PointToOffset(p image.Point, rect image.Rectangle) int {
+	return p.X + p.Y*rect.Dx()
+}
+
+// Given an offset and a rectangle return the point representing that offset.
+func OffsetToPoint(offset int, rect image.Rectangle) image.Point {
+	return image.Point{
+		X: offset % rect.Dx(),
+		Y: offset / rect.Dx(),
+	}
+}
+
+////////////////////////////////////////////////////////
+
 func ColorDetermined(rect image.Rectangle, cp ColorProducer, p Placer) image.Image {
 	img := image.NewRGBA(rect)
 	counter := 0
