@@ -108,7 +108,7 @@ func ColorDeterminedFrameSaver(rect image.Rectangle, cp ColorProducer, p Placer,
 }
 
 func SaveImage(name string, img image.Image) error {
-	f, err := os.Create(fmt.Sprintf("%v.png", name))
+	f, err := os.Create(name)
 	if err != nil {
 		return err
 	}
