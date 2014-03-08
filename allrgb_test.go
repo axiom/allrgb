@@ -2,6 +2,7 @@ package allrgb
 
 import (
 	"image"
+	"image/color"
 	"testing"
 )
 

@@ -25,7 +25,7 @@ func (tp *trivialPlacer) Place(_ color.Color) image.Point {
 	return p
 }
 
-func SampleColorProducer() chan color.Color {
+func RGBColorProducer() chan color.Color {
 	nextColor := make(chan color.Color)
 	go func() {
 		for r := 0; r < 32; r++ {

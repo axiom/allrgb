@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+
 	go func() {
 		fmt.Println(http.ListenAndServe("localhost:8080", nil))
 	}()
@@ -17,15 +18,22 @@ func main() {
 	rect := image.Rectangle{Max: image.Point{X: 256, Y: 128}}
 
 	configurations := map[string]image.Image{
-		"trivial": allrgb.ColorDetermined(
+		"trivial.png": allrgb.ColorDetermined(
 			rect,
-			allrgb.ColorProducerFunc(examples.SampleColorProducer),
+			allrgb.ColorProducerFunc(examples.HSLColorProducer),
 			examples.NewTrivialPlacer(rect)),
 
-		"hilbert": allrgb.ColorDetermined(
+		"hilbert.png": allrgb.ColorDetermined(
 			rect,
-			allrgb.ColorProducerFunc(examples.SampleColorProducer),
+			allrgb.ColorProducerFunc(examples.HSLColorProducer),
 			examples.NewHilbertPlacer(rect)),
+
+		/*
+			"frontier": allrgb.ColorDetermined(
+				rect,
+				allrgb.ColorProducerFunc(examples.SampleColorProducer),
+				examples.NewFrontier(rect)),
+		*/
 	}
 
 	for name, img := range configurations {
@@ -36,8 +44,10 @@ func main() {
 
 	allrgb.ColorDeterminedFrameSaver(
 		rect,
-		allrgb.ColorProducerFunc(examples.SampleColorProducer),
+		allrgb.ColorProducerFunc(examples.HSLColorProducer),
 		examples.NewFrontier(rect),
+		100,
 		"frontier",
 	)
+
 }
