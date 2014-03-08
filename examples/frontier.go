@@ -6,53 +6,75 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"sync"
 )
 
+type queueItem struct {
+	result chan image.Point
+	color  color.Color
+}
+
 type frontier struct {
+	sync.Mutex
 	image.Rectangle
-	frontier map[image.Point]bool
-	taken    map[image.Point]color.Color
+	frontier      map[image.Point]bool
+	taken         map[image.Point]sadcolor.HSL
+	placeQueue    chan queueItem
+	previousPoint image.Point
 }
 
 func NewFrontier(rect image.Rectangle) *frontier {
 	f := frontier{}
 	f.frontier = make(map[image.Point]bool)
-	f.taken = make(map[image.Point]color.Color)
+	f.taken = make(map[image.Point]sadcolor.HSL)
+	f.placeQueue = make(chan queueItem)
 	f.Max = rect.Max
 
 	// Start at some place.
-	f.extend([]image.Point{{rect.Dx() / 2, rect.Dy() / 2}})
+	start := image.Point{rect.Dx() / 2, rect.Dy() / 2}
+	f.previousPoint = start
+	f.extend([]image.Point{start})
+
+	for i := 0; i < 1; i++ {
+		go func() {
+			f.place()
+		}()
+	}
 
 	return &f
 }
 
 func (f *frontier) Place(c color.Color) image.Point {
-	var best image.Point
-	shortest := 0xfffffffffffffff
+	pointResult := make(chan image.Point)
+	f.placeQueue <- queueItem{result: pointResult, color: c}
+	return <-pointResult
+}
 
-	// We want to find the place with the least color differance in the frontier.
-	for p, _ := range f.frontier {
-		var colors []color.Color
-		for _, neighbour := range f.takenNeighbours(p) {
-			colors = append(colors, f.taken[neighbour])
+// Place colors from the queue.
+func (f *frontier) place() {
+	fmt.Println("Started worker")
+	for queueItem := range f.placeQueue {
+		best := f.previousPoint
+		shortest := 10e100
+
+		// We want to find the place with the least color differance in the frontier.
+		for p, _ := range f.frontier {
+			var colors []sadcolor.HSL
+			for _, neighbour := range f.takenNeighbours(p) {
+				colors = append(colors, f.taken[neighbour])
+			}
+
+			if distance := colorDistance(queueItem.color, colors) + f.distancePrevious(p); distance < shortest {
+				shortest = distance
+				best = p
+			}
 		}
 
-		if distance := colorDistance(c, colors); distance < shortest {
-			shortest = distance
-			best = p
-		}
-	}
+		f.take(best, queueItem.color)
 
-	if shortest == 0xfffffffffffffff {
-		fmt.Println("COULD NOT FIND GOOD MATCH")
+		queueItem.result <- best
+		close(queueItem.result)
 	}
-
-	if _, ok := f.taken[best]; ok {
-		panic("OMG TRIED TO PLACE ON TAKEN POINT")
-	}
-
-	f.take(best, c)
-	return best
 }
 
 // Get all the possible neighbourns of the given point.
@@ -60,32 +82,14 @@ func (f frontier) neighbours(p image.Point) []image.Point {
 	// There can be at most 8 neighbours
 	neighbours := make([]image.Point, 0, 8)
 
-	if p.Y > 0 {
-		neighbours = append(neighbours, image.Point{X: p.X, Y: p.Y - 1}) // North
-		if p.X < f.Max.X {
-			neighbours = append(neighbours, image.Point{X: p.X + 1, Y: p.Y - 1}) // North-east
+	for dx := -1; dx <= 1; dx++ {
+		if p.X+dx >= 0 && p.X+dx < f.Dx() {
+			for dy := -1; dy <= 1; dy++ {
+				if p.Y+dy >= 0 && p.Y+dy < f.Dy() {
+					neighbours = append(neighbours, image.Point{X: p.X + dx, Y: p.Y + dy})
+				}
+			}
 		}
-		if p.X > 0 {
-			neighbours = append(neighbours, image.Point{X: p.X - 1, Y: p.Y - 1}) // North-west
-		}
-	}
-
-	if p.Y < f.Max.Y {
-		neighbours = append(neighbours, image.Point{X: p.X, Y: p.Y + 1}) // South
-		if p.X < f.Max.X {
-			neighbours = append(neighbours, image.Point{X: p.X + 1, Y: p.Y + 1}) // South-east
-		}
-		if p.X > 0 {
-			neighbours = append(neighbours, image.Point{X: p.X - 1, Y: p.Y + 1}) // South-west
-		}
-	}
-
-	if p.X < f.Max.X {
-		neighbours = append(neighbours, image.Point{X: p.X + 1, Y: p.Y}) // East
-	}
-
-	if p.X > 0 {
-		neighbours = append(neighbours, image.Point{X: p.X - 1, Y: p.Y}) // West
 	}
 
 	return neighbours
@@ -128,20 +132,30 @@ func (f *frontier) extend(ps []image.Point) {
 
 // Take some points from the frontier.
 func (f *frontier) take(p image.Point, c color.Color) {
-	f.taken[p] = c
+	// We need to make sure we don't place a color ontop of another, if se we try again.
+	if _, ok := f.taken[p]; ok {
+		panic("I lost the race")
+	}
+
+	f.taken[p] = sadcolor.HSLModel.Convert(c).(sadcolor.HSL)
 	f.extend(f.availableNeighbours(p))
 	delete(f.frontier, p)
+	f.previousPoint = p
+}
+
+func (f frontier) distancePrevious(p image.Point) float64 {
+	dx := f.previousPoint.X - p.X
+	dy := f.previousPoint.Y - p.Y
+	return 3 * math.Sqrt(math.Pow(float64(dx), 2)+math.Pow(float64(dy), 2))
 }
 
 // Get a distance value for the differance of the given color to the slice of colors.
-func colorDistance(c color.Color, colors []color.Color) int {
-	chsl := sadcolor.HSLModel.Convert(c).(sadcolor.HSL)
+func colorDistance(color color.Color, colors []sadcolor.HSL) float64 {
+	c := sadcolor.HSLModel.Convert(color).(sadcolor.HSL)
 	diff := 0.0
-	var cchsl sadcolor.HSL
-	for _, color := range colors {
-		cchsl = sadcolor.HSLModel.Convert(color).(sadcolor.HSL)
-		diff += math.Sqrt(math.Pow(chsl.L-cchsl.L, 2))
+	for _, cc := range colors {
+		diff += 3*math.Pow(c.H-cc.H, 2) + 2*math.Pow(c.L-cc.L, 2) + 1*math.Pow(c.S-cc.S, 2)
 	}
 
-	return int(100000*diff) / (1 + len(colors))
+	return 100 * math.Sqrt(diff) / float64(len(colors))
 }
