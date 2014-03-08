@@ -2,7 +2,6 @@ package examples
 
 import (
 	sadcolor "code.google.com/p/sadbox/color"
-	"fmt"
 	"github.com/axiom/allrgb"
 	"image"
 	"image/color"
@@ -43,7 +42,7 @@ func NewFrontier(rect image.Rectangle) *frontier {
 
 func (f *frontier) Place(c color.Color) image.Point {
 	best := f.previousPoint
-	shortest := 10e100
+	shortest := 10e128
 
 	// We want to find the place with the least color differance in the frontier.
 	for p, _ := range f.frontier {
@@ -55,7 +54,6 @@ func (f *frontier) Place(c color.Color) image.Point {
 		}
 
 		if distance := colorDistance(c, colors) + f.distancePrevious(p); distance < shortest {
-			fmt.Println("Found better")
 			shortest = distance
 			best = p
 		}
@@ -102,32 +100,24 @@ func (f frontier) neighbours(p image.Point) []image.Point {
 
 // Get only the available (unpainted) neighbours of the given point.
 func (f frontier) availableNeighbours(p image.Point) []image.Point {
-	offset := f.offset(p)
-	neighbours := f.neighbours(p)
-	available := make([]image.Point, 0, len(neighbours))
-
-	for _, neighbour := range neighbours {
-		if _, ok := f.frontier[p]; ok && !f.occupied[offset] {
-			available = append(available, neighbour)
+	neighbours := make([]image.Point, 0, 8)
+	for _, neighbour := range f.neighbours(p) {
+		if !f.occupied[allrgb.PointToOffset(neighbour, f.Rectangle)] {
+			neighbours = append(neighbours, neighbour)
 		}
 	}
-
-	return available
+	return neighbours
 }
 
 // Get only the taken (painted) neighbours of the given point.
 func (f frontier) takenNeighbours(p image.Point) []image.Point {
-	offset := f.offset(p)
-	neighbours := f.neighbours(p)
-	taken := make([]image.Point, 0, len(neighbours))
-
-	for _, neighbour := range neighbours {
-		if f.occupied[offset] {
-			taken = append(taken, neighbour)
+	neighbours := make([]image.Point, 0, 8)
+	for _, neighbour := range f.neighbours(p) {
+		if f.occupied[allrgb.PointToOffset(neighbour, f.Rectangle)] {
+			neighbours = append(neighbours, neighbour)
 		}
 	}
-
-	return taken
+	return neighbours
 }
 
 // Extend the frontier with more points.
@@ -140,11 +130,6 @@ func (f *frontier) extend(ps []image.Point) {
 // Take some points from the frontier.
 func (f *frontier) take(p image.Point, c color.Color) {
 	offset := f.offset(p)
-
-	f.Lock()
-	defer f.Unlock()
-
-	fmt.Println("Taking", p, c, offset)
 
 	// We need to make sure we don't place a color ontop of another, if se we try again.
 	if f.occupied[offset] {

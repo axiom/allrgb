@@ -5,15 +5,17 @@ import (
 	"github.com/axiom/allrgb"
 	"github.com/axiom/allrgb/examples"
 	"image"
-	"net/http"
-	_ "net/http/pprof"
+	//"net/http"
+	//_ "net/http/pprof"
 )
 
 func main() {
 
-	go func() {
-		fmt.Println(http.ListenAndServe("localhost:8080", nil))
-	}()
+	/*
+		go func() {
+			fmt.Println(http.ListenAndServe("localhost:8080", nil))
+		}()
+	*/
 
 	rect := image.Rectangle{Max: image.Point{X: 256, Y: 128}}
 
@@ -28,19 +30,19 @@ func main() {
 			allrgb.ColorProducerFunc(examples.HSLColorProducer),
 			examples.NewHilbertPlacer(rect)),
 
-		/*
-			"frontier": allrgb.ColorDetermined(
-				rect,
-				allrgb.ColorProducerFunc(examples.SampleColorProducer),
-				examples.NewFrontier(rect)),
-		*/
+		"frontier": allrgb.ColorDetermined(
+			rect,
+			allrgb.ColorProducerFunc(examples.SampleColorProducer),
+			examples.NewFrontier(rect)),
 	}
 
-	for name, img := range configurations {
-		if err := allrgb.SaveImage(name, img); err != nil {
-			fmt.Printf("Could not do %v: %v\n", name, err)
+	/*
+		for name, img := range configurations {
+			if err := allrgb.SaveImage(name, img); err != nil {
+				fmt.Printf("Could not do %v: %v\n", name, err)
+			}
 		}
-	}
+	*/
 
 	allrgb.ColorDeterminedFrameSaver(
 		rect,
