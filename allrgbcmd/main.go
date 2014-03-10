@@ -5,12 +5,14 @@ import (
 	"github.com/axiom/allrgb"
 	. "github.com/axiom/allrgb/examples"
 	"image"
+	"runtime"
 	"time"
 	//"net/http"
 	//_ "net/http/pprof"
 )
 
 func main() {
+	runtime.GOMAXPROCS(8)
 
 	/*
 		go func() {
@@ -23,12 +25,12 @@ func main() {
 	configurations := map[string]image.Image{
 		"trivial.png": allrgb.ColorDetermined(
 			rect,
-			allrgb.ColorProducerFunc(HSLColorProducer),
+			NewHSLColorProducer(H, L, S, true, false, true),
 			NewTrivialPlacer(rect)),
 
 		"hilbert.png": allrgb.ColorDetermined(
 			rect,
-			allrgb.ColorProducerFunc(HSLColorProducer),
+			NewHSLColorProducer(S, H, L, true, false, true),
 			NewHilbertPlacer(rect)),
 
 		/*
@@ -47,8 +49,8 @@ func main() {
 
 	allrgb.ColorDeterminedFrameSaver(
 		rect,
-		//NewHSLColorProducer(H, L, S, true, true, true),
-		allrgb.ColorProducerFunc(HSLColorProducer),
+		NewHSLColorProducer(H, L, S, false, false, true),
+		//allrgb.ColorProducerFunc(RGBColorProducer),
 		NewFrontier(rect),
 		100,
 		fmt.Sprintf("frames/frontier-%v", time.Now().Format("20060102T150405")),
